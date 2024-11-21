@@ -1,5 +1,4 @@
 use serde_json::json;
-
 use core_data::models::workflow::*;
 use core_data::models::task::*;
 
@@ -8,38 +7,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_workflow_builder_defaults() {
-        let workflow = WorkflowBuilder::default().build().unwrap();
-
-        assert_eq!(workflow.name, "");
-        assert_eq!(workflow.description, "");
-        assert_eq!(workflow.version, 0);
-        assert!(workflow.tags.is_empty());
-        assert_eq!(workflow.status, WorkflowStatus::Draft);
-        assert!(workflow.tasks.is_empty());
-    }
-
-    #[test]
     fn test_workflow_custom_values() {
-        let task = TaskBuilder::default()
-            .task_id(String::from("task_1"))
-            .name(String::from("Task 1"))
-            .description(String::from("First task"))
-            .trigger_condition(json!({"condition": "value"}))
-            .function(FunctionType::Validate)
-            .build()
-            .unwrap();
-
-        let workflow = WorkflowBuilder::default()
-            .name(String::from("Workflow 1"))
-            .description(String::from("Test workflow"))
-            .version(1)
-            .tags(vec![String::from("tag1"), String::from("tag2")])
-            .status(WorkflowStatus::Active)
-            .tasks(vec![task.clone()])
-            .build()
-            .unwrap();
-
+        let task = Task {
+            task_id: String::from("task_1"),
+            name: String::from("Task 1"),
+            description: String::from("First task"),
+            condition: json!({"condition": "value"}),
+            function: FunctionType::Validate,
+            input: json!({"input": "value"}),
+        };
+        let workflow = Workflow {
+            name: String::from("Workflow 1"),
+            description: String::from("Test workflow"),
+            version: 1,
+            tags: vec![String::from("tag1"), String::from("tag2")],
+            status: WorkflowStatus::Active,
+            tasks: vec![task.clone()],
+            condition: json!({"condition": "value"}),
+        };
         assert_eq!(workflow.name, String::from("Workflow 1"));
         assert_eq!(workflow.description, String::from("Test workflow"));
         assert_eq!(workflow.version, 1);
@@ -51,12 +36,15 @@ mod tests {
 
     #[test]
     fn test_workflow_empty_tasks() {
-        let workflow = WorkflowBuilder::default()
-            .name(String::from("Empty Workflow"))
-            .description(String::from("Workflow with no tasks"))
-            .build()
-            .unwrap();
-
+        let workflow = Workflow {
+            name: String::from("Empty Workflow"),
+            description: String::from("Workflow with no tasks"),
+            version: 0,
+            tags: vec![],
+            status: WorkflowStatus::Draft,
+            tasks: vec![],
+            condition: json!({"condition": "value"}),
+        };
         assert_eq!(workflow.name, String::from("Empty Workflow"));
         assert_eq!(workflow.description, String::from("Workflow with no tasks"));
         assert!(workflow.tasks.is_empty());
@@ -64,31 +52,31 @@ mod tests {
 
     #[test]
     fn test_workflow_multiple_tasks() {
-        let task1 = TaskBuilder::default()
-            .task_id(String::from("task_1"))
-            .name(String::from("Task 1"))
-            .description(String::from("First task"))
-            .trigger_condition(json!({"condition": "value"}))
-            .function(FunctionType::Validate)
-            .build()
-            .unwrap();
-
-        let task2 = TaskBuilder::default()
-            .task_id(String::from("task_2"))
-            .name(String::from("Task 2"))
-            .description(String::from("Second task"))
-            .trigger_condition(json!({"condition": "value"}))
-            .function(FunctionType::Enrich)
-            .build()
-            .unwrap();
-
-        let workflow = WorkflowBuilder::default()
-            .name(String::from("Workflow with Multiple Tasks"))
-            .description(String::from("Workflow containing multiple tasks"))
-            .tasks(vec![task1.clone(), task2.clone()])
-            .build()
-            .unwrap();
-
+        let task1 = Task {
+            task_id: String::from("task_1"),
+            name: String::from("Task 1"),
+            description: String::from("First task"),
+            condition: json!({"condition": "value"}),
+            function: FunctionType::Validate,
+            input: json!({"input": "value"}),
+        };
+        let task2 = Task {
+            task_id: String::from("task_2"),
+            name: String::from("Task 2"),
+            description: String::from("Second task"),
+            condition: json!({"condition": "value"}),
+            function: FunctionType::Enrich,
+            input: json!({"input": "value"}),
+        };
+        let workflow = Workflow {
+            name: String::from("Workflow with Multiple Tasks"),
+            description: String::from("Workflow containing multiple tasks"),
+            version: 0,
+            tags: vec![],
+            status: WorkflowStatus::Draft,
+            tasks: vec![task1.clone(), task2.clone()],
+            condition: json!({"condition": "value"}),
+        };
         assert_eq!(workflow.name, String::from("Workflow with Multiple Tasks"));
         assert_eq!(workflow.description, String::from("Workflow containing multiple tasks"));
         assert_eq!(workflow.tasks.len(), 2);

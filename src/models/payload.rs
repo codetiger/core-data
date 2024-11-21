@@ -1,34 +1,51 @@
 use serde::{Deserialize, Serialize};
-use derive_builder::Builder;
 
-#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Payload {
     /// Storage type: inline or file
     #[serde(rename = "type")]
-    #[builder(default = "PayloadType::Inline")]
     pub payload_type: PayloadType,
     
     /// Actual content when stored inline
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[builder(default = "None")]
     pub content: Option<serde_json::Value>,
     
     /// URL for external content
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[builder(default = "None")]
     pub url: Option<String>,
     
     /// Content format
-    #[builder(default = "PayloadFormat::Xml")]
     pub format: PayloadFormat,
     
     /// Character encoding
-    #[builder(default = "Encoding::Utf8")]
     pub encoding: Encoding,
     
     /// Size in bytes
-    #[builder(default = "0")]
     pub size: i64,
+}
+
+impl Payload {
+    pub fn new_inline(content: Option<serde_json::Value>, format: PayloadFormat, encoding: Encoding) -> Self {
+        Self {
+            payload_type: PayloadType::Inline,
+            content,
+            url: None,
+            format,
+            encoding,
+            size: 0,
+        }
+    }
+
+    pub fn new_file(url: Option<String>, format: PayloadFormat, encoding: Encoding, size: i64) -> Self {
+        Self {
+            payload_type: PayloadType::File,
+            content: None,
+            url,
+            format,
+            encoding,
+            size,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

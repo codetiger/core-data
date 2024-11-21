@@ -1,56 +1,71 @@
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use derive_builder::Builder;
 use sonyflake::Sonyflake;
 
-#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct AuditLog {
     /// Unique identifier for the audit log
     #[serde(rename = "id")]
-    #[builder(default = "Sonyflake::new().unwrap().next_id().unwrap()")]
     pub id: u64,
 
     #[serde(with = "time::serde::iso8601")]
-    #[builder(default = "OffsetDateTime::UNIX_EPOCH")]
     pub timestamp: OffsetDateTime,
 
-    #[builder(default = "String::from(\"\")")]
     pub workflow: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub task: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub description: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub hash: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub service: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub instance: String,
 
-    #[builder(default = "String::from(\"\")")]
     pub version: String,
 
-    #[builder(default = "Vec::new()")]
     pub changes: Vec<ChangeLog>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+impl AuditLog {
+    pub fn new() -> Self {
+        let sf = Sonyflake::new().unwrap();
+        let id = sf.next_id().unwrap();
+        let timestamp = OffsetDateTime::now_utc();
+        AuditLog {
+            id,
+            timestamp,
+            workflow: "".to_string(),
+            task: "".to_string(),
+            description: "".to_string(),
+            hash: "".to_string(),
+            service: "".to_string(),
+            instance: "".to_string(),
+            version: "".to_string(),
+            changes: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ChangeLog {
-    #[builder(default = "String::from(\"\")")]
     pub field: String,
 
-    #[builder(default = "None")]
     pub old_value: Option<serde_json::Value>,
 
-    #[builder(default = "None")]
     pub new_value: Option<serde_json::Value>,
 
-    #[builder(default = "String::from(\"\")")]
     pub reason: String,
+}
 
+impl ChangeLog {
+    pub fn new() -> Self {
+        ChangeLog {
+            field: "".to_string(),
+            old_value: None,
+            new_value: None,
+            reason: "".to_string(),
+        }
+    }
 }
