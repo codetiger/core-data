@@ -28,6 +28,12 @@ pub struct AuditLog {
     pub changes: Vec<ChangeLog>,
 }
 
+impl Default for AuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuditLog {
     pub fn new() -> Self {
         let sf = Sonyflake::new().unwrap();
@@ -57,6 +63,12 @@ pub struct ChangeLog {
     pub new_value: Option<serde_json::Value>,
 
     pub reason: String,
+}
+
+impl Default for ChangeLog {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChangeLog {

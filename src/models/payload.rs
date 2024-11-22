@@ -3,12 +3,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Payload {
     /// Storage type: inline or file
-    #[serde(rename = "type")]
-    pub payload_type: PayloadType,
+    pub storage: StorageType,
     
     /// Actual content when stored inline
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<serde_json::Value>,
+    pub content: Option<Vec<u8>>,
     
     /// URL for external content
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -16,6 +15,8 @@ pub struct Payload {
     
     /// Content format
     pub format: PayloadFormat,
+
+    pub schema: PayloadSchema,
     
     /// Character encoding
     pub encoding: Encoding,
@@ -25,23 +26,25 @@ pub struct Payload {
 }
 
 impl Payload {
-    pub fn new_inline(content: Option<serde_json::Value>, format: PayloadFormat, encoding: Encoding) -> Self {
+    pub fn new_inline(content: Option<Vec<u8>>, format: PayloadFormat, schema: PayloadSchema, encoding: Encoding) -> Self {
         Self {
-            payload_type: PayloadType::Inline,
+            storage: StorageType::Inline,
             content,
             url: None,
             format,
+            schema,
             encoding,
             size: 0,
         }
     }
 
-    pub fn new_file(url: Option<String>, format: PayloadFormat, encoding: Encoding, size: i64) -> Self {
+    pub fn new_file(url: Option<String>, format: PayloadFormat, schema: PayloadSchema, encoding: Encoding, size: i64) -> Self {
         Self {
-            payload_type: PayloadType::File,
+            storage: StorageType::File,
             content: None,
             url,
             format,
+            schema,
             encoding,
             size,
         }
@@ -50,7 +53,7 @@ impl Payload {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum PayloadType {
+pub enum StorageType {
     Inline,
     File,
 }
@@ -60,6 +63,12 @@ pub enum PayloadType {
 pub enum PayloadFormat {
     Xml,
     Json,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PayloadSchema {
+    ISO20022,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
