@@ -20,6 +20,8 @@ fn test_message_lifecycle() {
         payload,
         "banking".to_string(),
         "pacs.008.001.07".to_string(), 
+        "test_message_lifecycle".to_string(),
+        "ISOOutgoing".to_string(),
         Some("payment".to_string())
     );
 
@@ -28,8 +30,10 @@ fn test_message_lifecycle() {
     assert_eq!(message.audit().len(), 1);
 
     // Stage 2: Parse ISO20022 XML
-    message.parse(Some("Parsed payment message".to_string()))
-        .expect("Failed to parse message");
+    message.parse(Some("Parsed payment message".to_string()),
+        "test_message_lifecycle".to_string(),
+        "ISOOutgoing".to_string(),
+    ).expect("Failed to parse message");
 
     // Verify parsed state
     assert!(!message.data().is_null());
@@ -61,7 +65,9 @@ fn test_message_lifecycle() {
     message.enrich(
         enrichment_config,
         enrichment_data,
-        Some("Applied metadata enrichment".to_string())
+        Some("Applied metadata enrichment".to_string()),
+        "test_message_lifecycle".to_string(),
+        "ISOOutgoing".to_string(),
     ).expect("Failed to enrich message");
 
     // Verify final enriched state

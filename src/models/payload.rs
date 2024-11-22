@@ -61,27 +61,23 @@ impl Payload {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "lowercase")]
 pub enum StorageType {
     Inline,
     File,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "lowercase")]
 pub enum PayloadFormat {
     Xml,
     Json,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "lowercase")]
 pub enum PayloadSchema {
     ISO20022,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "UPPERCASE")]
 pub enum Encoding {
     #[serde(rename = "UTF-8")]
     Utf8,
@@ -91,6 +87,4 @@ pub enum Encoding {
     Utf32,
     #[serde(rename = "ASCII")]
     Ascii,
-    #[serde(rename = "ISO-8859-1")]
-    Latin1,
 }

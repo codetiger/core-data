@@ -19,12 +19,14 @@ fn main() {
         payload,
         "banking".to_string(),
         "pacs.008.001.07".to_string(),
+        "UsageExample".to_string(),
+        "ISOOutgoing".to_string(),
         Some("Payment".to_string()),
     );
 
     // Time the parse operation
     let parse_start = Instant::now();
-    message.parse(Some("Parsed pacs.008 message".to_string()))
+    message.parse(Some("Parsed pacs.008 message".to_string()), "UsageExample".to_string(), "ISOOutgoing".to_string())
         .expect("Failed to parse XML message");
     let parse_duration = parse_start.elapsed();
 
@@ -48,7 +50,7 @@ fn main() {
 
     // Time the enrich operation
     let enrich_start = Instant::now();
-    message.enrich(enrichment_config, enrichment_data, Some("Enriched pacs.008 message".to_string()))
+    message.enrich(enrichment_config, enrichment_data, Some("Enriched pacs.008 message".to_string()), "UsageExample".to_string(), "ISOOutgoing".to_string())
         .expect("Failed to enrich message");
     let enrich_duration = enrich_start.elapsed();
 

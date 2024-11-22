@@ -8,7 +8,10 @@ pub struct AuditLog {
     id: u64,
 
     #[serde(with = "time::serde::iso8601")]
-    timestamp: OffsetDateTime,
+    pub start_time: OffsetDateTime,
+
+    #[serde(with = "time::serde::iso8601")]
+    pub finish_time: OffsetDateTime,
 
     workflow: Box<str>,
 
@@ -30,10 +33,6 @@ pub struct AuditLog {
 impl AuditLog {
     pub fn id(&self) -> u64 {
         self.id
-    }
-
-    pub fn timestamp(&self) -> &OffsetDateTime {
-        &self.timestamp
     }
 
     pub fn workflow(&self) -> &str {
@@ -68,13 +67,22 @@ impl AuditLog {
         &self.changes
     }
 
-    pub fn new(workflow: String, task: String, description: String, changes: Vec<ChangeLog>) -> Self {
+    pub fn start_time(&self) -> &OffsetDateTime {
+        &self.start_time
+    }
+
+    pub fn finish_time(&self) -> &OffsetDateTime {
+        &self.finish_time
+    }
+
+    pub fn new(workflow: String, task: String, start_time: OffsetDateTime, description: String, changes: Vec<ChangeLog>) -> Self {
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
         let timestamp = OffsetDateTime::now_utc();
         AuditLog {
             id,
-            timestamp,
+            start_time,
+            finish_time: timestamp,
             workflow: workflow.into_boxed_str(),
             task: task.into_boxed_str(),
             description: description.into_boxed_str(),

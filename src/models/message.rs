@@ -21,7 +21,7 @@ pub struct Progress {
 
     pub prev_task: String,
     
-    pub prev_status_code: String,
+    pub prev_status_code: Option<StatusCode>,
     
     #[serde(with = "time::serde::iso8601")]
     pub timestamp: OffsetDateTime,
@@ -45,6 +45,12 @@ pub struct EnrichmentConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum StatusCode {
+    Success,
+    Failure,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Message {
     #[serde(rename = "id")]
     id: u64,
@@ -64,6 +70,9 @@ pub struct Message {
     progress: Progress,
 
     audit: Vec<AuditLog>,
+
+    #[serde(skip)]
+    transaction_changes: Option<Vec<(String, Value)>>,
 }
 
 impl Message {
@@ -75,7 +84,101 @@ impl Message {
         &self.data
     }
 
-    pub fn new(payload: Payload, tenant: String, origin: String, message_alias: Option<String>) -> Self {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn metadata(&self) -> &Value {
+        &self.metadata
+    }
+
+    pub fn origin(&self) -> &String {
+        &self.origin
+    }
+
+    pub fn parent_id(&self) -> &Option<String> {
+        &self.parent_id
+    }
+
+    pub fn payload(&self) -> &Payload {
+        &self.payload
+    }
+
+    pub fn progress(&self) -> &Progress {
+        &self.progress
+    }
+
+    pub fn tenant(&self) -> &String {
+        &self.tenant
+    }
+
+    fn transaction_begin(&mut self, workflow: String, task: String) {
+        self.progress.workflow_id = workflow;
+        self.progress.prev_task = task;
+        self.transaction_changes = Some(Vec::new());
+    }
+
+    fn transaction_rollback(&mut self) {
+        if let Some(changes) = self.transaction_changes.take() {
+            for (field_path, old_value) in changes.iter().rev() {
+                let parts: Vec<&str> = field_path.split('.').collect();
+                let mut current = &mut self.data;
+                
+                // Navigate to the parent object
+                for part in parts.iter().take(parts.len() - 1) {
+                    if !current[part].is_object() {
+                        break;
+                    }
+                    current = current.get_mut(part).unwrap();
+                }
+                
+                // Restore the old value
+                if let Some(last_part) = parts.last() {
+                    current[*last_part] = old_value.clone();
+                }
+            }
+        }
+        self.progress.prev_status_code = Some(StatusCode::Failure);
+        self.progress.timestamp = OffsetDateTime::now_utc();
+    }
+
+    fn transaction_commit(&mut self) {
+        self.progress.prev_status_code = Some(StatusCode::Success);
+        self.progress.timestamp = OffsetDateTime::now_utc();
+        self.transaction_changes = None;
+    }
+
+    fn update(&mut self, field_path: &str, new_value: Value) -> Result<(), FunctionResponseError> {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        
+        if parts[0] != "data" {
+            return Err(FunctionResponseError::new(
+                "Update".to_string(),
+                400,
+                "Invalid field path".to_string()
+            ));
+        }
+
+        let mut current = &mut self.data;
+        for (i, part) in parts.iter().enumerate().skip(1) {
+            if i == parts.len() - 1 {
+                // Store old value for potential rollback
+                if let Some(changes) = &mut self.transaction_changes {
+                    changes.push((field_path.to_string(), current[part].clone()));
+                }
+                current[part] = new_value.clone();
+            } else {
+                if !current[part].is_object() {
+                    current[part] = json!({});
+                }
+                current = current.get_mut(part).unwrap();
+            }
+        }
+        Ok(())
+    }
+
+    pub fn new(payload: Payload, tenant: String, origin: String, workflow: String, task: String, message_alias: Option<String>) -> Self {
+        let start_time = OffsetDateTime::now_utc();
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
 
@@ -89,8 +192,9 @@ impl Message {
 
         let change_log = ChangeLog::new("payload".to_string(), reason, None, None);
         let audit = AuditLog::new(
-            String::new().to_string(), 
-            String::new().to_string(), 
+            workflow.to_string(), 
+            task.to_string(), 
+            start_time,
             description.to_string(),
             vec![change_log]
         );
@@ -105,63 +209,71 @@ impl Message {
             metadata: Value::Null,
             progress: Progress {
                 status: MessageStatus::Recieved,
-                workflow_id: "".to_string(),
-                prev_task: "".to_string(),
-                prev_status_code: "".to_string(),
+                workflow_id: workflow.to_string(),
+                prev_task: task.to_string(),
+                prev_status_code: Some(StatusCode::Success),
                 timestamp: OffsetDateTime::now_utc(),
             },
             audit: vec![audit],
+            transaction_changes: Some(Vec::new()),
         }
     }
     
-    pub fn enrich(&mut self, config: Vec<EnrichmentConfig>, data: serde_json::Value, description: Option<String>) -> Result<(), FunctionResponseError> {
+    pub fn enrich(&mut self, config: Vec<EnrichmentConfig>, data: serde_json::Value, description: Option<String>, workflow: String, task: String) -> Result<(), FunctionResponseError> {
+        let start_time = OffsetDateTime::now_utc();
         let logic = JsonLogic::new();
         let mut changes = Vec::new();
+        
+        // Begin transaction
+        self.transaction_begin(workflow.clone(), task.clone());
 
         for cfg in config {
-            let value = logic.apply(&cfg.rule, &data).unwrap();
-            let field_path: Vec<&str> = cfg.field.split('.').collect();
-            let root_field = field_path[0];
-    
-            if root_field == "data" {
-                let mut current = &mut self.data;
-                for (i, part) in field_path.iter().enumerate().skip(1) {
-                    if i == field_path.len() - 1 {
-                        let old_value = current[part].take();
-                        current[part] = value.clone();
-                        let change = ChangeLog::new(
-                            cfg.field.to_string(),
-                            cfg.description.clone().unwrap_or_else(|| format!("Enriched field {}", cfg.field)), 
-                            Some(old_value),
-                            Some(value.clone())
-                        );
-                        changes.push(change);
-                    } else {
-                        if !current[part].is_object() {
-                            current[part] = json!({});
-                        }
-                        current = current.get_mut(part).unwrap();
-                    }
+            let value = match logic.apply(&cfg.rule, &data) {
+                Ok(v) => v,
+                Err(e) => {
+                    // Rollback on error
+                    self.transaction_rollback();
+                    return Err(FunctionResponseError::new(
+                        "Enrichment".to_string(),
+                        400,
+                        format!("Rule application failed: {:?}", e)
+                    ));
                 }
-            } else {
-                return Err(FunctionResponseError::new("Enrichment".to_string(), 400, "Invalid field path".to_string()));
+            };
+
+            // Update with transaction support
+            if let Err(e) = self.update(&cfg.field, value.clone()) {
+                self.transaction_rollback();
+                return Err(e);
             }
+
+            // Record change for audit
+            changes.push(ChangeLog::new(
+                cfg.field.to_string(),
+                cfg.description.unwrap_or_else(|| format!("Enriched field {}", cfg.field)),
+                None,
+                Some(value)
+            ));
         }
-    
+
+        // Commit transaction
+        self.transaction_commit();
+
+        // Create audit log
         let audit_log = AuditLog::new(
-            String::new().to_string(),
-            String::new().to_string(),
+            workflow.to_string(),
+            task.to_string(),
+            start_time,
             description.unwrap_or_else(|| "Enrichment applied".to_string()),
             changes
         );
         self.audit.push(audit_log);
-
         Ok(())
     }
 
-    pub fn parse(&mut self, description: Option<String>) -> Result<(), FunctionResponseError> {
+    pub fn parse(&mut self, description: Option<String>, workflow: String, task: String) -> Result<(), FunctionResponseError> {
         const BUFFER_SIZE: usize = 32 * 1024; // 32KB buffer
-
+        let start_time = OffsetDateTime::now_utc();
         let buf_reader: Box<dyn BufRead> = if let Some(content) = self.payload.content() {
             Box::new(BufReader::with_capacity(
                 BUFFER_SIZE,
@@ -196,8 +308,9 @@ impl Message {
                             None
                         );
                         let audit_log = AuditLog::new(
-                            String::new().to_string(),
-                            String::new().to_string(),
+                            workflow.to_string(),
+                            task.to_string(),
+                            start_time,
                             description.unwrap_or_else(|| "ISO20022 message parsed".to_string()),
                             vec![change_log]
                         );
