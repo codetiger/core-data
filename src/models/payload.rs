@@ -3,30 +3,39 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Payload {
     /// Storage type: inline or file
-    pub storage: StorageType,
+    storage: StorageType,
     
     /// Actual content when stored inline
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<Vec<u8>>,
+    content: Option<Box<[u8]>>,
     
     /// URL for external content
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    url: Option<Box<str>>,
     
     /// Content format
-    pub format: PayloadFormat,
+    format: PayloadFormat,
 
-    pub schema: PayloadSchema,
+    schema: PayloadSchema,
     
     /// Character encoding
-    pub encoding: Encoding,
+    encoding: Encoding,
     
     /// Size in bytes
-    pub size: i64,
+    size: i64,
 }
 
 impl Payload {
+    pub fn content(&self) -> Option<&[u8]> {
+        self.content.as_deref()
+    }
+
+    pub fn url(&self) -> Option<&str> {
+        self.url.as_deref()
+    }
+
     pub fn new_inline(content: Option<Vec<u8>>, format: PayloadFormat, schema: PayloadSchema, encoding: Encoding) -> Self {
+        let content = content.map(|v| v.into_boxed_slice());
         Self {
             storage: StorageType::Inline,
             content,
@@ -38,11 +47,11 @@ impl Payload {
         }
     }
 
-    pub fn new_file(url: Option<String>, format: PayloadFormat, schema: PayloadSchema, encoding: Encoding, size: i64) -> Self {
+    pub fn new_file<S: Into<Box<str>>>(url: Option<S>, format: PayloadFormat, schema: PayloadSchema, encoding: Encoding, size: i64) -> Self {
         Self {
             storage: StorageType::File,
             content: None,
-            url,
+            url: url.map(|s| s.into()),
             format,
             schema,
             encoding,

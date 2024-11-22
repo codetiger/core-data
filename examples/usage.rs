@@ -59,16 +59,16 @@ fn main() {
     println!("Total processing time: {:?}", parse_duration + enrich_duration);
 
     println!("\nParsed and Enriched Message:");
-    println!("{}", serde_json::to_string_pretty(&message.data).unwrap());
+    println!("{}", serde_json::to_string_pretty(&message.data()).unwrap());
 
     println!("\nAudit Trail:");
-    for audit in &message.audit {
-        println!("Description: {}", audit.description);
-        for change in &audit.changes {
-            println!("  Field: {}", change.field);
-            println!("  Old Value: {:?}", change.old_value);
-            println!("  New Value: {:?}", change.new_value);
-            println!("  Reason: {}", change.reason);
+    for audit in message.audit() {
+        println!("Description: {}", audit.description());
+        for change in audit.changes() {
+            println!("  Field: {}", change.field());
+            println!("  Old Value: {:?}", change.old_value());
+            println!("  New Value: {:?}", change.new_value());
+            println!("  Reason: {}", change.reason());
         }
     }
 }

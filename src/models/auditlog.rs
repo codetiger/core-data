@@ -4,80 +4,123 @@ use sonyflake::Sonyflake;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct AuditLog {
-    /// Unique identifier for the audit log
     #[serde(rename = "id")]
-    pub id: u64,
+    id: u64,
 
     #[serde(with = "time::serde::iso8601")]
-    pub timestamp: OffsetDateTime,
+    timestamp: OffsetDateTime,
 
-    pub workflow: String,
+    workflow: Box<str>,
 
-    pub task: String,
+    task: Box<str>,
 
-    pub description: String,
+    description: Box<str>,
 
-    pub hash: String,
+    hash: Box<str>,
 
-    pub service: String,
+    service: Box<str>,
 
-    pub instance: String,
+    instance: Box<str>,
 
-    pub version: String,
+    version: Box<str>,
 
-    pub changes: Vec<ChangeLog>,
-}
-
-impl Default for AuditLog {
-    fn default() -> Self {
-        Self::new()
-    }
+    changes: Box<[ChangeLog]>,
 }
 
 impl AuditLog {
-    pub fn new() -> Self {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn timestamp(&self) -> &OffsetDateTime {
+        &self.timestamp
+    }
+
+    pub fn workflow(&self) -> &str {
+        &self.workflow
+    }
+
+    pub fn task(&self) -> &str {
+        &self.task
+    }
+
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.hash
+    }
+
+    pub fn service(&self) -> &str {
+        &self.service
+    }
+
+    pub fn instance(&self) -> &str {
+        &self.instance
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn changes(&self) -> &[ChangeLog] {
+        &self.changes
+    }
+
+    pub fn new(workflow: String, task: String, description: String, changes: Vec<ChangeLog>) -> Self {
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
         let timestamp = OffsetDateTime::now_utc();
         AuditLog {
             id,
             timestamp,
-            workflow: "".to_string(),
-            task: "".to_string(),
-            description: "".to_string(),
-            hash: "".to_string(),
-            service: "".to_string(),
-            instance: "".to_string(),
-            version: "".to_string(),
-            changes: vec![],
+            workflow: workflow.into_boxed_str(),
+            task: task.into_boxed_str(),
+            description: description.into_boxed_str(),
+            hash: String::new().into_boxed_str(),
+            service: String::new().into_boxed_str(),
+            instance: String::new().into_boxed_str(),
+            version: String::new().into_boxed_str(),
+            changes: changes.into_boxed_slice(),
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ChangeLog {
-    pub field: String,
+    field: Box<str>,
 
-    pub old_value: Option<serde_json::Value>,
+    old_value: Option<serde_json::Value>,
 
-    pub new_value: Option<serde_json::Value>,
+    new_value: Option<serde_json::Value>,
 
-    pub reason: String,
-}
-
-impl Default for ChangeLog {
-    fn default() -> Self {
-        Self::new()
-    }
+    reason: Box<str>,
 }
 
 impl ChangeLog {
-    pub fn new() -> Self {
+    pub fn field(&self) -> &str {
+        &self.field
+    }
+
+    pub fn old_value(&self) -> Option<&serde_json::Value> {
+        self.old_value.as_ref()
+    }
+
+    pub fn new_value(&self) -> Option<&serde_json::Value> {
+        self.new_value.as_ref()
+    }
+
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+    
+    pub fn new(field: String, reason: String, old_value: Option<serde_json::Value>, new_value: Option<serde_json::Value>) -> Self {
         ChangeLog {
-            field: "".to_string(),
-            old_value: None,
-            new_value: None,
-            reason: "".to_string(),
+            field: field.into_boxed_str(),
+            old_value: old_value,
+            new_value: new_value,
+            reason: reason.into_boxed_str(),
         }
     }
 }

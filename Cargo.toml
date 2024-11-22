@@ -5,10 +5,10 @@ edition = "2021"
 exclude = ["/xsd", "/xml", ".DS_Store", "/target", ".vscode", "generate.sh"]
 authors = ["Harishankar Narayanan <nharishankar@gmail.com>"]
 license = "Apache-2.0"
-description = "Open Payments - Payment Processor"
-readme = "../README.md"
-homepage = "https://github.com/Open-Payments/messages"
-repository = "https://github.com/Open-Payments/messages"
+description = "Open Payments - Core Data Library"
+readme = "README.md"
+homepage = "https://github.com/Open-Payments/core-data"
+repository = "https://github.com/Open-Payments/core-data"
 keywords = ["financial", "payments", "message", "iso20022", "processor"]
 categories = ["data-structures", "development-tools", "finance", "parsing", "parser-implementations"]
 

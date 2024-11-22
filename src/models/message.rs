@@ -17,16 +17,12 @@ use crate::models::iso20022::ISO20022Message;
 pub struct Progress {
     pub status: MessageStatus,
 
-    /// Workflow definition identifier
     pub workflow_id: String,
 
-    /// Last completed task identifier
     pub prev_task: String,
     
-    /// Status code from last task
     pub prev_status_code: String,
     
-    /// Timestamp of last completion
     #[serde(with = "time::serde::iso8601")]
     pub timestamp: OffsetDateTime,
 }
@@ -50,33 +46,35 @@ pub struct EnrichmentConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Message {
-    /// Unique identifier for the message
     #[serde(rename = "id")]
-    pub id: u64,
+    id: u64,
 
-    pub parent_id: Option<String>,
+    parent_id: Option<String>,
 
-    /// Message payload containing content or reference
-    pub payload: Payload,
+    payload: Payload,
     
-    /// Tenant identifier
-    pub tenant: String,
+    tenant: String,
     
-    /// Origin of the message
-    pub origin: String,
+    origin: String,
     
-    /// Message data
-    pub data: Value,
+    data: Value,
 
-    pub metadata: Value,
+    metadata: Value,
     
-    /// Progress information
-    pub progress: Progress,
+    progress: Progress,
 
-    pub audit: Vec<AuditLog>,
+    audit: Vec<AuditLog>,
 }
 
 impl Message {
+    pub fn audit(&self) -> &Vec<AuditLog> {
+        &self.audit
+    }
+
+    pub fn data(&self) -> &Value {
+        &self.data
+    }
+
     pub fn new(payload: Payload, tenant: String, origin: String, message_alias: Option<String>) -> Self {
         let sf = Sonyflake::new().unwrap();
         let id = sf.next_id().unwrap();
@@ -89,14 +87,13 @@ impl Message {
             .unwrap_or_else(|| "Message".to_string()) + " created";
         let reason = "Initial message creation for ".to_string() + &alias.to_lowercase();
 
-        let mut audit = AuditLog::new();
-        audit.description = description;
-        audit.changes.push(ChangeLog {
-            field: "payload".to_string(),
-            old_value: None,
-            new_value: None,
-            reason,
-        });
+        let change_log = ChangeLog::new("payload".to_string(), reason, None, None);
+        let audit = AuditLog::new(
+            String::new().to_string(), 
+            String::new().to_string(), 
+            description.to_string(),
+            vec![change_log]
+        );
 
         Self {
             id,
@@ -119,9 +116,8 @@ impl Message {
     
     pub fn enrich(&mut self, config: Vec<EnrichmentConfig>, data: serde_json::Value, description: Option<String>) -> Result<(), FunctionResponseError> {
         let logic = JsonLogic::new();
-        let mut audit_log = AuditLog::new();
-        audit_log.description = description.unwrap_or_else(|| "Enrichment applied".to_string());
-    
+        let mut changes = Vec::new();
+
         for cfg in config {
             let value = logic.apply(&cfg.rule, &data).unwrap();
             let field_path: Vec<&str> = cfg.field.split('.').collect();
@@ -133,12 +129,13 @@ impl Message {
                     if i == field_path.len() - 1 {
                         let old_value = current[part].take();
                         current[part] = value.clone();
-                        audit_log.changes.push(ChangeLog {
-                            field: cfg.field.clone(),
-                            old_value: Some(old_value),
-                            new_value: Some(value.clone()),
-                            reason: cfg.description.clone().unwrap_or_else(|| format!("Enriched field {}", cfg.field)),
-                        });
+                        let change = ChangeLog::new(
+                            cfg.field.to_string(),
+                            cfg.description.clone().unwrap_or_else(|| format!("Enriched field {}", cfg.field)), 
+                            Some(old_value),
+                            Some(value.clone())
+                        );
+                        changes.push(change);
                     } else {
                         if !current[part].is_object() {
                             current[part] = json!({});
@@ -151,6 +148,12 @@ impl Message {
             }
         }
     
+        let audit_log = AuditLog::new(
+            String::new().to_string(),
+            String::new().to_string(),
+            description.unwrap_or_else(|| "Enrichment applied".to_string()),
+            changes
+        );
         self.audit.push(audit_log);
 
         Ok(())
@@ -159,13 +162,12 @@ impl Message {
     pub fn parse(&mut self, description: Option<String>) -> Result<(), FunctionResponseError> {
         const BUFFER_SIZE: usize = 32 * 1024; // 32KB buffer
 
-        // Create a BufReader explicitly
-        let buf_reader: Box<dyn BufRead> = if let Some(ref content) = self.payload.content {
+        let buf_reader: Box<dyn BufRead> = if let Some(content) = self.payload.content() {
             Box::new(BufReader::with_capacity(
                 BUFFER_SIZE,
-                content.as_slice()
+                content
             ))
-        } else if let Some(ref url) = self.payload.url {
+        } else if let Some(ref url) = self.payload.url() {
             let file = File::open(url).map_err(|e| {
                 FunctionResponseError::new(
                     "Parse".to_string(),
@@ -182,15 +184,22 @@ impl Message {
             ));
         };
 
-        // Parse using quick-xml with BufReader
         match from_reader::<_, ISO20022Message>(buf_reader) {
             Ok(message) => {
                 match message.validate() {
                     Ok(()) => {
                         self.data = serde_json::to_value(message).unwrap();
-                        let mut audit_log = AuditLog::new();
-                        audit_log.description = description.unwrap_or_else(|| 
-                            "ISO20022 message parsed".to_string()
+                        let change_log = ChangeLog::new(
+                            "data".to_string(),
+                            "ISO20022 message parsed".to_string(),
+                            None,
+                            None
+                        );
+                        let audit_log = AuditLog::new(
+                            String::new().to_string(),
+                            String::new().to_string(),
+                            description.unwrap_or_else(|| "ISO20022 message parsed".to_string()),
+                            vec![change_log]
                         );
                         self.audit.push(audit_log);
                         Ok(())
